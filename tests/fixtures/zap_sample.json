@@ -1,0 +1,125 @@
+{
+  "@version": "2.14.0",
+  "@generated": "Wed, 20 Nov 2026 12:00:00",
+  "site": [
+    {
+      "@name": "http://demo-target.example.com",
+      "@host": "demo-target.example.com",
+      "@port": "80",
+      "@ssl": "false",
+      "alerts": [
+        {
+          "pluginid": "40018",
+          "alertRef": "40018",
+          "alert": "SQL Injection",
+          "name": "SQL Injection",
+          "riskcode": "3",
+          "confidence": "2",
+          "riskdesc": "High (Medium)",
+          "desc": "SQL injection may be possible via the 'q' parameter.",
+          "solution": "Use parameterized queries (prepared statements) instead of building SQL from string concatenation.",
+          "reference": "https://owasp.org/www-community/attacks/SQL_Injection",
+          "cweid": "89",
+          "wascid": "19",
+          "instances": [
+            {
+              "uri": "http://demo-target.example.com/search?q=widget",
+              "method": "GET",
+              "param": "q",
+              "evidence": "SQL syntax error near"
+            }
+          ],
+          "count": "1"
+        },
+        {
+          "pluginid": "40012",
+          "alertRef": "40012",
+          "alert": "Cross Site Scripting (Reflected)",
+          "name": "Cross Site Scripting (Reflected)",
+          "riskcode": "3",
+          "confidence": "2",
+          "riskdesc": "High (Medium)",
+          "desc": "Reflected XSS may be possible via the 'name' parameter.",
+          "solution": "Encode/escape user input before including it in HTML output.",
+          "reference": "https://owasp.org/www-community/attacks/xss/",
+          "cweid": "79",
+          "wascid": "8",
+          "instances": [
+            {
+              "uri": "http://demo-target.example.com/greet?name=%3Cscript%3Ealert(1)%3C%2Fscript%3E",
+              "method": "GET",
+              "param": "name",
+              "evidence": "<script>alert(1)</script>"
+            }
+          ],
+          "count": "1"
+        },
+        {
+          "pluginid": "10202",
+          "alertRef": "10202",
+          "alert": "Absence of Anti-CSRF Tokens",
+          "name": "Absence of Anti-CSRF Tokens",
+          "riskcode": "2",
+          "confidence": "2",
+          "riskdesc": "Medium (Medium)",
+          "desc": "No Anti-CSRF tokens were found in a HTML submission form.",
+          "solution": "Use a framework-provided CSRF token on all state-changing forms.",
+          "reference": "https://owasp.org/www-community/attacks/csrf",
+          "cweid": "352",
+          "wascid": "9",
+          "instances": [
+            {
+              "uri": "http://demo-target.example.com/admin/delete_user",
+              "method": "GET",
+              "param": "",
+              "evidence": "<form"
+            }
+          ],
+          "count": "1"
+        },
+        {
+          "pluginid": "10098",
+          "alertRef": "10098",
+          "alert": "Cross-Domain Misconfiguration",
+          "name": "Cross-Domain Misconfiguration",
+          "riskcode": "2",
+          "confidence": "3",
+          "riskdesc": "Medium (High)",
+          "desc": "The Access-Control-Allow-Origin header is set to an overly permissive value.",
+          "solution": "Restrict Access-Control-Allow-Origin to a known set of trusted origins.",
+          "reference": "https://owasp.org/www-project-web-security-testing-guide/",
+          "cweid": "264",
+          "wascid": "14",
+          "instances": [
+            {
+              "uri": "http://demo-target.example.com/fetch",
+              "method": "GET",
+              "param": "Access-Control-Allow-Origin",
+              "evidence": "Access-Control-Allow-Origin: *"
+            }
+          ],
+          "count": "1"
+        },
+        {
+          "pluginid": "10021",
+          "alertRef": "10021",
+          "alert": "X-Content-Type-Options Header Missing",
+          "name": "X-Content-Type-Options Header Missing",
+          "riskcode": "1",
+          "confidence": "2",
+          "riskdesc": "Low (Medium)",
+          "desc": "The Anti-MIME-Sniffing header X-Content-Type-Options was not set.",
+          "solution": "Set the X-Content-Type-Options header to 'nosniff' on all responses.",
+          "reference": "https://owasp.org/www-project-secure-headers/",
+          "cweid": "16",
+          "wascid": "15",
+          "instances": [
+            {"uri": "http://demo-target.example.com/", "method": "GET", "param": "", "evidence": ""},
+            {"uri": "http://demo-target.example.com/search", "method": "GET", "param": "", "evidence": ""}
+          ],
+          "count": "2"
+        }
+      ]
+    }
+  ]
+}

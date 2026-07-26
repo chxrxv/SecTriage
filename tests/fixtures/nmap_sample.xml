@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet href="file:///usr/share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Synthetic sample output for SecTriage tests — not a real scan. -->
+<nmaprun scanner="nmap" args="nmap -sV -sC -oX results.xml 198.51.100.23" start="1732400000" version="7.94">
+<host starttime="1732400000" endtime="1732400030">
+<status state="up" reason="syn-ack"/>
+<address addr="198.51.100.23" addrtype="ipv4"/>
+<hostnames>
+<hostname name="demo-target.example.com" type="PTR"/>
+</hostnames>
+<ports>
+<port protocol="tcp" portid="21">
+<state state="open" reason="syn-ack"/>
+<service name="ftp" product="vsftpd" version="2.3.4" method="probed" conf="10"/>
+<script id="ftp-vsftpd-backdoor" output="VULNERABLE:&#10;vsftpd 2.3.4 backdoor&#10;    State: VULNERABLE (Exploitable)&#10;    IDs: CVE-2011-2523&#10;    This backdoor was introduced into the vsftpd-2.3.4 source code."/>
+</port>
+<port protocol="tcp" portid="22">
+<state state="open" reason="syn-ack"/>
+<service name="ssh" product="OpenSSH" version="8.9p1" method="probed" conf="10"/>
+</port>
+<port protocol="tcp" portid="23">
+<state state="open" reason="syn-ack"/>
+<service name="telnet" product="Linux telnetd" version="" method="probed" conf="10"/>
+</port>
+<port protocol="tcp" portid="80">
+<state state="open" reason="syn-ack"/>
+<service name="http" product="Apache httpd" version="2.4.41" method="probed" conf="10"/>
+</port>
+<port protocol="tcp" portid="443">
+<state state="open" reason="syn-ack"/>
+<service name="https" product="Apache httpd" version="2.4.41" method="probed" conf="10"/>
+</port>
+<port protocol="tcp" portid="3306">
+<state state="open" reason="syn-ack"/>
+<service name="mysql" product="MySQL" version="5.7.31" method="probed" conf="10"/>
+</port>
+</ports>
+</host>
+</nmaprun>

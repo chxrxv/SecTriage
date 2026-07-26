@@ -1,0 +1,31 @@
+{
+  "description": "Ground-truth manifest for the vulnerable_app fixture, derived from the # VULN / # SAFE / # MISSED / # FALSE_POSITIVE_EXPECTED marker comments in app.py and static/app.js. Used by tests/run_eval.py to compute precision/recall/F1 for the static code scanner.",
+  "entries": [
+    {"file": "app.py", "line": 25, "vuln_pattern": "hardcoded_secret", "is_actually_vulnerable": true, "expected_to_be_found": true, "note": "Stripe live key literal"},
+    {"file": "app.py", "line": 26, "vuln_pattern": "hardcoded_secret", "is_actually_vulnerable": true, "expected_to_be_found": true, "note": "AWS access key literal"},
+    {"file": "app.py", "line": 27, "vuln_pattern": "hardcoded_secret", "is_actually_vulnerable": false, "expected_to_be_found": false, "note": "Loaded from environment, not a literal"},
+    {"file": "app.py", "line": 39, "vuln_pattern": "sql_injection", "is_actually_vulnerable": true, "expected_to_be_found": true, "note": "f-string interpolation into execute()"},
+    {"file": "app.py", "line": 48, "vuln_pattern": "sql_injection", "is_actually_vulnerable": true, "expected_to_be_found": true, "note": "String concatenation into execute()"},
+    {"file": "app.py", "line": 57, "vuln_pattern": "sql_injection", "is_actually_vulnerable": false, "expected_to_be_found": false, "note": "Parameterized query"},
+    {"file": "app.py", "line": 66, "vuln_pattern": "sql_injection", "is_actually_vulnerable": true, "expected_to_be_found": false, "note": "Query built on one line, executed on the next — line-based scanner cannot see the taint across lines"},
+    {"file": "app.py", "line": 74, "vuln_pattern": "xss", "is_actually_vulnerable": true, "expected_to_be_found": true, "note": "Unescaped HTML built via string concatenation"},
+    {"file": "app.py", "line": 77, "vuln_pattern": "missing_auth_check", "is_actually_vulnerable": true, "expected_to_be_found": true, "note": "Unintended-but-valid catch: '/load_config' matches the 'config' keyword hint and has no auth decorator — and genuinely should require auth, since it also deserializes attacker-controlled data via pickle (line 79)"},
+    {"file": "app.py", "line": 79, "vuln_pattern": "insecure_deserialization", "is_actually_vulnerable": true, "expected_to_be_found": true, "note": "pickle.loads on request body"},
+    {"file": "app.py", "line": 85, "vuln_pattern": "insecure_deserialization", "is_actually_vulnerable": true, "expected_to_be_found": true, "note": "yaml.load without SafeLoader"},
+    {"file": "app.py", "line": 91, "vuln_pattern": "insecure_deserialization", "is_actually_vulnerable": false, "expected_to_be_found": false, "note": "yaml.load with explicit SafeLoader"},
+    {"file": "app.py", "line": 98, "vuln_pattern": "code_injection", "is_actually_vulnerable": true, "expected_to_be_found": true, "note": "eval() on user-controlled expression"},
+    {"file": "app.py", "line": 104, "vuln_pattern": "path_traversal", "is_actually_vulnerable": true, "expected_to_be_found": true, "note": "Unsanitized filename joined into open() path"},
+    {"file": "app.py", "line": 113, "vuln_pattern": "path_traversal", "is_actually_vulnerable": false, "expected_to_be_found": false, "note": "Filename sanitized with secure_filename() first"},
+    {"file": "app.py", "line": 121, "vuln_pattern": "ssrf", "is_actually_vulnerable": true, "expected_to_be_found": true, "note": "Outbound request to user-controlled URL, no allowlist"},
+    {"file": "app.py", "line": 128, "vuln_pattern": "command_injection", "is_actually_vulnerable": true, "expected_to_be_found": true, "note": "os.system() with concatenated user input"},
+    {"file": "app.py", "line": 132, "vuln_pattern": "missing_auth_check", "is_actually_vulnerable": true, "expected_to_be_found": true, "note": "Sensitive route with no auth decorator"},
+    {"file": "app.py", "line": 151, "vuln_pattern": "missing_auth_check", "is_actually_vulnerable": false, "expected_to_be_found": false, "note": "Route path has no sensitive keyword, heuristic should not fire"},
+    {"file": "static/app.js", "line": 4, "vuln_pattern": "hardcoded_secret", "is_actually_vulnerable": true, "expected_to_be_found": true, "note": "Hardcoded API key literal"},
+    {"file": "static/app.js", "line": 8, "vuln_pattern": "xss", "is_actually_vulnerable": true, "expected_to_be_found": true, "note": "innerHTML assigned from a variable"},
+    {"file": "static/app.js", "line": 13, "vuln_pattern": "xss", "is_actually_vulnerable": false, "expected_to_be_found": false, "note": "textContent does not parse HTML"},
+    {"file": "static/app.js", "line": 17, "vuln_pattern": "xss", "is_actually_vulnerable": true, "expected_to_be_found": true, "note": "document.write() with a variable"},
+    {"file": "static/app.js", "line": 21, "vuln_pattern": "insecure_deserialization", "is_actually_vulnerable": true, "expected_to_be_found": true, "note": "eval() on user-controlled code"},
+    {"file": "static/app.js", "line": 25, "vuln_pattern": "ssrf", "is_actually_vulnerable": true, "expected_to_be_found": true, "note": "fetch() on a user-controlled URL, no allowlist"},
+    {"file": "static/app.js", "line": 33, "vuln_pattern": "ssrf", "is_actually_vulnerable": false, "expected_to_be_found": true, "note": "URL is allowlist-checked before fetch(); the line-based scanner has no data-flow analysis and cannot see the check above, so it is expected to (incorrectly) flag this line"}
+  ]
+}
