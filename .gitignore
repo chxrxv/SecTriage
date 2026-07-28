@@ -7,4 +7,6 @@ build/
 dist/
 sectriage-report/
 demo-output/
+demo-output-ollama/
 .pytest_cache/
+.claude/

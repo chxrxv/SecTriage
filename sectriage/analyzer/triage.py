@@ -1,4 +1,5 @@
-"""Orchestrates per-finding triage calls (mock or live) and aggregates run metrics."""
+"""Orchestrates per-finding triage calls (mock, Claude, or local Ollama) and
+aggregates run metrics."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -6,6 +7,9 @@ from dataclasses import dataclass, field
 from ..models import Finding, TriagedFinding
 from .llm_client import DEFAULT_LIVE_MODEL, LLMClient
 from .mock import mock_triage
+from .ollama_client import DEFAULT_OLLAMA_HOST, DEFAULT_OLLAMA_MODEL, OllamaClient
+
+PROVIDERS = ("claude", "ollama")
 
 
 @dataclass
@@ -48,14 +52,37 @@ def _build_context(finding: Finding, internet_facing: bool) -> str:
     return "; ".join(parts)
 
 
+def _default_model_for(provider: str) -> str:
+    return DEFAULT_OLLAMA_MODEL if provider == "ollama" else DEFAULT_LIVE_MODEL
+
+
 def triage_findings(
     findings: list[Finding],
     live: bool = False,
-    model: str = DEFAULT_LIVE_MODEL,
+    provider: str = "claude",
+    model: str | None = None,
     internet_facing: bool = False,
+    ollama_host: str = DEFAULT_OLLAMA_HOST,
 ) -> tuple[list[TriagedFinding], TriageMetrics]:
-    metrics = TriageMetrics(mode="live" if live else "mock", model=model if live else "mock-analyzer")
-    client = LLMClient(model=model) if live else None
+    """`live=False` always uses the free mock analyzer regardless of `provider`.
+    `live=True` dispatches to `provider` ("claude" — paid, requires
+    ANTHROPIC_API_KEY — or "ollama" — free, requires a local Ollama server)."""
+    if live and provider not in PROVIDERS:
+        raise ValueError(f"Unknown provider {provider!r}; expected one of {PROVIDERS}")
+
+    resolved_model = model or _default_model_for(provider)
+    metrics = TriageMetrics(
+        mode=f"live:{provider}" if live else "mock",
+        model=resolved_model if live else "mock-analyzer",
+    )
+
+    client = None
+    if live:
+        client = (
+            OllamaClient(model=resolved_model, host=ollama_host)
+            if provider == "ollama"
+            else LLMClient(model=resolved_model)
+        )
 
     results: list[TriagedFinding] = []
     for finding in findings:
@@ -64,10 +91,14 @@ def triage_findings(
         if live:
             triage_result, stats = client.triage(finding, context)
             wall_clock = stats.wall_clock_seconds
-            metrics.total_input_tokens += stats.input_tokens
-            metrics.total_output_tokens += stats.output_tokens
-            metrics.total_cache_read_tokens += stats.cache_read_input_tokens
-            metrics.total_cache_creation_tokens += stats.cache_creation_input_tokens
+            if provider == "claude":
+                metrics.total_input_tokens += stats.input_tokens
+                metrics.total_output_tokens += stats.output_tokens
+                metrics.total_cache_read_tokens += stats.cache_read_input_tokens
+                metrics.total_cache_creation_tokens += stats.cache_creation_input_tokens
+            else:  # ollama
+                metrics.total_input_tokens += stats.prompt_tokens
+                metrics.total_output_tokens += stats.completion_tokens
         else:
             triage_result, stats = mock_triage(finding, context)
             wall_clock = stats["wall_clock_seconds"]

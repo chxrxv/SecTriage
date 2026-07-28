@@ -72,8 +72,11 @@ pip install -e .
 ```
 
 Requires Python 3.10+. The only dependency is the `anthropic` SDK, and it's only
-*imported* if you actually run with `--live` — the default mock mode needs nothing
-beyond the standard library.
+*imported* if you actually run with `--live --provider claude` — mock mode and
+`--live --provider ollama` need nothing beyond the standard library (the Ollama
+client talks HTTP via `urllib`, not the `anthropic` SDK). To use `--provider
+ollama`, install [Ollama](https://ollama.com) separately and pull a model:
+`ollama pull llama3.2:1b`.
 
 > `pip install -e .` may install the `sectriage` script to a user Scripts directory
 > that isn't on your `PATH` yet (pip will warn if so). If `sectriage` isn't found,
@@ -90,6 +93,9 @@ sectriage scan --nmap results.xml --zap zap-report.json --code ./my-repo
 export ANTHROPIC_API_KEY=sk-ant-...
 sectriage scan --code ./my-repo --live
 
+# Free real-LLM triage via a local model (requires Ollama running locally)
+sectriage scan --code ./my-repo --live --provider ollama
+
 # Treat every finding as internet-facing for exploitability/priority scoring
 sectriage scan --code ./my-repo --internet-facing
 
@@ -100,20 +106,36 @@ sectriage scan --code ./my-repo
 Every run prints a terminal summary table and writes `report.json` +
 `report.html` to `--out-dir` (default `./sectriage-report`).
 
-### Mock mode vs. `--live`
+### Three analyzer modes
 
-There is no free tier for the Claude **API** itself (only claude.ai's chat UI is
-free) — it's pay-per-token. So SecTriage defaults to a deterministic **mock
-analyzer** that reproduces the same OWASP-mapping / prioritization logic using the
+| Mode | Flag | Cost | What it uses |
+|---|---|---|---|
+| Mock (default) | *(none)* | Free, always | Deterministic keyword/pattern heuristics — no network call at all |
+| Claude | `--live` (or `--live --provider claude`) | Paid, requires `ANTHROPIC_API_KEY` | `claude-haiku-4-5` by default via structured outputs |
+| Local (Ollama) | `--live --provider ollama` | Free, requires local install | A small open-source model (default `llama3.2:1b`) running entirely on your machine, no account or key |
+
+**Mock mode** reproduces the same OWASP-mapping / prioritization logic using the
 vuln-pattern taxonomy the code scanner already assigns, with zero network calls and
 zero cost. This lets you exercise the entire pipeline — parsing, triage, dedup,
 report rendering — for free, and is what the bundled test suite runs against.
 
-Pass `--live` (with `ANTHROPIC_API_KEY` set) to get real Claude-generated
-explanations, exploitability assessments, and remediation text. Default live model
-is `claude-haiku-4-5` — the cheapest current model, which is more than sufficient
-for a bounded classification-and-remediation task like this one. Override with
-`--model`.
+**`--live` (Claude)** gets you real Claude-generated explanations, exploitability
+assessments, and remediation text. Default model is `claude-haiku-4-5` — the
+cheapest current model, which is more than sufficient for a bounded
+classification-and-remediation task like this one. Override with `--model`.
+
+**`--live --provider ollama`** runs against a locally-installed
+[Ollama](https://ollama.com) server (`ollama pull llama3.2:1b` after installing) —
+genuinely free, no API key, no account, ever. It exists so you can watch the
+pipeline produce real (non-mock) generated text at zero cost. **Be aware it is
+not a substitute for Claude on quality**: in testing, the default 1B model
+correctly detected the presence of an issue but frequently mis-assigned the OWASP
+category — e.g. classifying SQL injection, hardcoded secrets, and SSRF findings
+all as `A01:2021-Broken Access Control` (most should have landed in `A03`, `A07`,
+and `A10` respectively) when run at `temperature: 0`. The results.md numbers are
+Claude/mock-only for this reason; treat the Ollama path as a "see it work locally
+for free" option, not a source of trustworthy triage output. A larger local model
+would likely do better at the cost of much slower CPU inference.
 
 ### Caching and cost
 
@@ -153,10 +175,14 @@ demonstrated deliberately in the test fixture — see
 
 Findings from different tools sometimes point at the same underlying issue — e.g.
 Nmap flagging an outdated TLS service and ZAP flagging a weak-cipher alert on the
-same host. `sectriage/report/dedup.py` groups findings by (normalized asset, OWASP
-category) after triage and marks all but the highest-priority one in each group as a
-duplicate. This is a heuristic, not semantic matching — see the module docstring for
-the tradeoffs.
+same host. `sectriage/report/dedup.py` merges two findings only when they share the
+same normalized `host:port` **and** OWASP category **and** come from *different*
+source tools — the same-tool requirement matters: two distinct findings from one
+tool (e.g. a ZAP SQLi alert and a ZAP XSS alert that both happen to map to
+`A03:2021-Injection`) are never candidates for merging with each other, only across
+tools. Source-code findings never merge with each other at all, since `file.py:39`
+already identifies a unique location. This is a heuristic, not semantic matching —
+see the module docstring for the full tradeoffs.
 
 ## Testing & accuracy evaluation
 
@@ -192,8 +218,9 @@ sectriage/
   analyzer/
     schemas.py            OWASP categories + structured-output JSON schema
     llm_client.py         Claude API call (structured outputs + prompt caching)
+    ollama_client.py       Free local-model call via Ollama's HTTP API
     mock.py                Free deterministic stand-in for the LLM call
-    triage.py              Orchestrates per-finding triage + run metrics
+    triage.py              Orchestrates per-finding triage + run metrics, picks the backend
   report/
     dedup.py               Cross-tool deduplication
     terminal_report.py      Plain-text summary table
@@ -201,8 +228,8 @@ sectriage/
     json_report.py          Machine-readable JSON export
 tests/
   fixtures/                Nmap/ZAP sample files + the vulnerable_app fixture
-  run_eval.py              Accuracy/timing evaluation -> results.md
-  test_*.py                 Unit tests
+  run_eval.py              Accuracy/timing evaluation -> results.md (mock/Claude only)
+  test_*.py                 Unit tests, including a mocked-HTTP Ollama client test
 ```
 
 Adding a new scanner input type means writing one new parser module that returns a

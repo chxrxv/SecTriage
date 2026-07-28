@@ -12,6 +12,8 @@ import time
 
 from .analyzer import triage_findings
 from .analyzer.llm_client import DEFAULT_LIVE_MODEL
+from .analyzer.ollama_client import DEFAULT_OLLAMA_HOST, DEFAULT_OLLAMA_MODEL, is_ollama_available
+from .analyzer.ollama_client import OllamaUnavailableError
 from .models import Finding
 from .parsers import parse_nmap, parse_zap, scan_codebase
 from .report import deduplicate, render_terminal_summary
@@ -54,10 +56,20 @@ def cmd_scan(args: argparse.Namespace) -> int:
         print("error: provide at least one of --nmap, --zap, --code", file=sys.stderr)
         return 1
 
-    if args.live and not os.environ.get("ANTHROPIC_API_KEY"):
+    if args.live and args.provider == "claude" and not os.environ.get("ANTHROPIC_API_KEY"):
         print(
-            "error: --live requires ANTHROPIC_API_KEY to be set in the environment.\n"
-            "       Omit --live to run the free mock analyzer instead.",
+            "error: --live --provider claude requires ANTHROPIC_API_KEY to be set in the environment.\n"
+            "       Omit --live to run the free mock analyzer, or pass --provider ollama\n"
+            "       for a free local model instead (requires Ollama running locally).",
+            file=sys.stderr,
+        )
+        return 1
+
+    if args.live and args.provider == "ollama" and not is_ollama_available(args.ollama_host):
+        print(
+            f"error: --live --provider ollama could not reach Ollama at {args.ollama_host}.\n"
+            "       Install it from https://ollama.com, make sure it's running, and pull a\n"
+            f"       model first: `ollama pull {args.model or DEFAULT_OLLAMA_MODEL}`.",
             file=sys.stderr,
         )
         return 1
@@ -67,21 +79,25 @@ def cmd_scan(args: argparse.Namespace) -> int:
         print("No findings to triage.")
         return 0
 
-    mode = "live" if args.live else "mock"
-    print(f"\nTriaging {len(findings)} finding(s) with the {mode} analyzer"
-          f"{f' ({args.model})' if args.live else ''}...")
+    mode = f"live ({args.provider})" if args.live else "mock"
+    print(f"\nTriaging {len(findings)} finding(s) with the {mode} analyzer...")
 
     started = time.monotonic()
-    triaged, metrics = triage_findings(
-        findings, live=args.live, model=args.model, internet_facing=args.internet_facing
-    )
+    try:
+        triaged, metrics = triage_findings(
+            findings, live=args.live, provider=args.provider, model=args.model,
+            internet_facing=args.internet_facing, ollama_host=args.ollama_host,
+        )
+    except OllamaUnavailableError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
     triaged = deduplicate(triaged)
     total_elapsed = time.monotonic() - started
 
     print(render_terminal_summary(triaged))
     print(
         f"\nTriage wall-clock: {total_elapsed:.2f}s "
-        f"({metrics.to_dict()['avg_seconds_per_finding']:.3f}s/finding avg)"
+        f"({metrics.to_dict()['avg_seconds_per_finding']:.3f}s/finding avg, model: {metrics.model})"
     )
 
     os.makedirs(args.out_dir, exist_ok=True)
@@ -105,9 +121,19 @@ def build_parser() -> argparse.ArgumentParser:
     scan_parser.add_argument("--code", help="Path to a local codebase directory for static review")
     scan_parser.add_argument(
         "--live", action="store_true",
-        help="Use the real Claude API instead of the free mock analyzer (requires ANTHROPIC_API_KEY)",
+        help="Use a real LLM instead of the free mock analyzer (see --provider)",
     )
-    scan_parser.add_argument("--model", default=DEFAULT_LIVE_MODEL, help=f"Model to use with --live (default: {DEFAULT_LIVE_MODEL})")
+    scan_parser.add_argument(
+        "--provider", choices=["claude", "ollama"], default="claude",
+        help="Which backend to use with --live: 'claude' (paid, requires ANTHROPIC_API_KEY, "
+             f"default model {DEFAULT_LIVE_MODEL}) or 'ollama' (free, runs locally, requires "
+             f"a running Ollama server, default model {DEFAULT_OLLAMA_MODEL})",
+    )
+    scan_parser.add_argument("--model", default=None, help="Model to use with --live (defaults depend on --provider)")
+    scan_parser.add_argument(
+        "--ollama-host", default=DEFAULT_OLLAMA_HOST,
+        help=f"Ollama server URL when --provider ollama (default: {DEFAULT_OLLAMA_HOST})",
+    )
     scan_parser.add_argument(
         "--internet-facing", action="store_true",
         help="Treat all findings as internet-facing for exploitability/priority assessment",
